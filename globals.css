@@ -1,0 +1,229 @@
+/**
+ * Widget Editor modal for configuring widget title, type, data source, and visualization.
+ */
+
+import React, { useState } from "react";
+import { WidgetCreatePayload } from "../../api/dashboards";
+
+interface WidgetEditorProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (widget: WidgetCreatePayload) => void;
+  dataSources: Array<{ id: string; name: string; source_type: string }>;
+  initialValues?: Partial<WidgetCreatePayload>;
+}
+
+const WIDGET_TYPES = [
+  { value: "line_chart", label: "Line Chart", icon: "~" },
+  { value: "bar_chart", label: "Bar Chart", icon: "|" },
+  { value: "pie_chart", label: "Pie Chart", icon: "o" },
+  { value: "area_chart", label: "Area Chart", icon: "^" },
+  { value: "scatter_plot", label: "Scatter Plot", icon: "." },
+  { value: "metric_card", label: "Metric Card", icon: "#" },
+  { value: "data_table", label: "Data Table", icon: "=" },
+  { value: "gauge", label: "Gauge", icon: "G" },
+  { value: "heatmap", label: "Heatmap", icon: "H" },
+  { value: "text", label: "Text / Markdown", icon: "T" },
+];
+
+const WidgetEditor: React.FC<WidgetEditorProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  dataSources,
+  initialValues,
+}) => {
+  const [title, setTitle] = useState(initialValues?.title || "");
+  const [widgetType, setWidgetType] = useState(initialValues?.widget_type || "line_chart");
+  const [dataSource, setDataSource] = useState(initialValues?.data_source || "");
+  const [queryText, setQueryText] = useState(
+    ((initialValues?.query_config as Record<string, string>)?.query) || ""
+  );
+  const [xAxis, setXAxis] = useState(
+    ((initialValues?.visualization_config as Record<string, string>)?.xAxis) || ""
+  );
+  const [yAxes, setYAxes] = useState(
+    ((initialValues?.visualization_config as Record<string, string>)?.yAxes) || ""
+  );
+  const [width, setWidth] = useState(initialValues?.width || 4);
+  const [height, setHeight] = useState(initialValues?.height || 3);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const widget: WidgetCreatePayload = {
+      title: title || "Untitled Widget",
+      widget_type: widgetType,
+      data_source: dataSource || undefined,
+      query_config: queryText ? { query: queryText } : {},
+      visualization_config: {
+        xAxis: xAxis || undefined,
+        yAxes: yAxes ? yAxes.split(",").map((y) => y.trim()) : [],
+      },
+      width,
+      height,
+    };
+
+    onSave(widget);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-xl font-semibold text-gray-900">
+            {initialValues ? "Edit Widget" : "Add Widget"}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">
+            x
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Widget Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Revenue by Month"
+            />
+          </div>
+
+          {/* Widget Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Widget Type</label>
+            <div className="grid grid-cols-5 gap-2">
+              {WIDGET_TYPES.map((type) => (
+                <button
+                  key={type.value}
+                  type="button"
+                  onClick={() => setWidgetType(type.value)}
+                  className={`p-3 rounded-lg border-2 text-center transition-colors ${
+                    widgetType === type.value
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-gray-200 hover:border-gray-300 text-gray-600"
+                  }`}
+                >
+                  <div className="text-lg font-mono">{type.icon}</div>
+                  <div className="text-xs mt-1">{type.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Data Source */}
+          {widgetType !== "text" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Source</label>
+              <select
+                value={dataSource}
+                onChange={(e) => setDataSource(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">Select a data source...</option>
+                {dataSources.map((ds) => (
+                  <option key={ds.id} value={ds.id}>
+                    {ds.name} ({ds.source_type})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Query */}
+          {widgetType !== "text" && dataSource && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Query</label>
+              <textarea
+                value={queryText}
+                onChange={(e) => setQueryText(e.target.value)}
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SELECT date, revenue FROM sales ORDER BY date"
+              />
+            </div>
+          )}
+
+          {/* Axis Configuration */}
+          {!["text", "metric_card", "data_table"].includes(widgetType) && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">X-Axis Column</label>
+                <input
+                  type="text"
+                  value={xAxis}
+                  onChange={(e) => setXAxis(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  placeholder="date"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Y-Axis Columns (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={yAxes}
+                  onChange={(e) => setYAxes(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                  placeholder="revenue, expenses"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Size */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Width (grid units)</label>
+              <input
+                type="number"
+                value={width}
+                onChange={(e) => setWidth(parseInt(e.target.value) || 4)}
+                min={1}
+                max={12}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Height (grid units)</label>
+              <input
+                type="number"
+                value={height}
+                onChange={(e) => setHeight(parseInt(e.target.value) || 3)}
+                min={1}
+                max={12}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              {initialValues ? "Update Widget" : "Add Widget"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default WidgetEditor;

@@ -1,0 +1,50 @@
+"""
+Production-specific Django settings.
+"""
+
+import os
+
+from .base import *  # noqa: F401, F403
+
+DEBUG = False
+
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split(",")
+
+# Security settings
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True") == "True"
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# CORS: restrict to configured origins only
+CORS_ALLOW_ALL_ORIGINS = False
+
+# Production logging with file output
+LOGGING["handlers"]["file"] = {  # noqa: F405
+    "class": "logging.handlers.RotatingFileHandler",
+    "filename": BASE_DIR / "logs" / "insightboard.log",  # noqa: F405
+    "maxBytes": 10 * 1024 * 1024,
+    "backupCount": 10,
+    "formatter": "verbose",
+}
+LOGGING["root"]["handlers"] = ["console", "file"]  # noqa: F405
+LOGGING["loggers"]["django"]["handlers"] = ["console", "file"]  # noqa: F405
+LOGGING["loggers"]["apps"]["handlers"] = ["console", "file"]  # noqa: F405
+LOGGING["loggers"]["apps"]["level"] = "INFO"  # noqa: F405
+
+# Cache: longer timeout in production
+CACHES["default"]["TIMEOUT"] = 900  # noqa: F405
+
+# Celery: production optimizations
+CELERY_TASK_ALWAYS_EAGER = False
+CELERY_WORKER_PREFETCH_MULTIPLIER = 4
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+
+# Email: use real SMTP in production
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

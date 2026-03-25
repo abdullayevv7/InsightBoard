@@ -1,0 +1,62 @@
+"""
+Visualization views: CRUD for chart configs and visualizations.
+"""
+
+from django.db.models import Q
+from rest_framework import viewsets, permissions
+
+from .models import ChartConfig, Visualization
+from .serializers import (
+    ChartConfigSerializer,
+    ChartConfigCreateSerializer,
+    VisualizationListSerializer,
+    VisualizationDetailSerializer,
+    VisualizationCreateSerializer,
+)
+
+
+class ChartConfigViewSet(viewsets.ModelViewSet):
+    """Chart configuration CRUD viewset."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return ChartConfigCreateSerializer
+        return ChartConfigSerializer
+
+    def get_queryset(self):
+        return ChartConfig.objects.filter(
+            Q(organization=self.request.user.organization)
+            | Q(is_global=True)
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(
+            created_by=self.request.user,
+            organization=self.request.user.organization,
+        )
+
+
+class VisualizationViewSet(viewsets.ModelViewSet):
+    """Visualization CRUD viewset."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return VisualizationListSerializer
+        if self.action == "create":
+            return VisualizationCreateSerializer
+        return VisualizationDetailSerializer
+
+    def get_queryset(self):
+        return Visualization.objects.filter(
+            organization=self.request.user.organization
+        ).select_related("data_source", "data_query", "chart_config", "created_by")
+
+    def perform_create(self, serializer):
+        serializer.save(
+            created_by=self.request.user,
+            organization=self.request.user.organization,
+        )
